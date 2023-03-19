@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity  >=0.8.0;
+
+contract Score{
+    mapping(address=>uint) public scores;
+    function changeScore(address addr, uint score) external{
+        scores[addr] = score;
+    }
+}
+
+interface scoreInterface{
+    function changeScore() external;
+}
+
+contract Teacher{
+    function changeScore(address addr, uint score) external{
+        scoreInterface(addr, score).changeScore();
+    }
+}
