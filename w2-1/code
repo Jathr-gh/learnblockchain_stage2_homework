@@ -1,0 +1,35 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity >=0.8.0;
+
+contract mybank{
+    mapping(address => uint) public balances;            
+
+    // 接受转账-方法1：直接从钱包（比如metamask）接受
+    receive() external payable{
+        balances[msg.sender] += msg.value;
+    }
+
+    // 接受转账-方法2：自定义函数，可被其他合约调用
+    function deposit() public payable{
+        balances[msg.sender] += msg.value;
+    }
+
+    // 返回账户余额
+    function get_balance() public view returns(uint){
+        return balances[msg.sender];
+    }
+
+    // 一次性提取本人账户中的所有余额、到本人钱包
+    function withdrawAll() public payable{        
+        require(balances[msg.sender]>0, "balance is empty");
+
+        // 转账前先扣除转账金额，来防止重入攻击；如果转账失败，交易会被revert
+        uint amount = balances[msg.sender];
+        delete balances[msg.sender];
+
+        // 进行转账
+        balances[msg.sender] = 0;
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Failed to extract eth");
+    }
+}
