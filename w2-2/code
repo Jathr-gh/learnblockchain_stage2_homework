@@ -1,19 +1,58 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity  >=0.8.0;
 
-contract Score{
-    mapping(address=>uint) public scores;
-    function changeScore(address addr, uint score) external{
+contract studentScore{
+    error scoreOverflow();
+
+    address owner; //创建本合约的外部账户
+    address teacher; //后续能使用本合约、的teacher合约账户
+    mapping(address=>uint) public scores; 
+
+    constructor(){
+        owner = msg.sender; //定义创建者地址，作为teacher地址
+    }    
+
+    
+    //指定能使用本合约的teacher账户addr
+    function setTeacher(address addr) public{
+        if (owner == msg.sender)
+            teacher = addr; //当请求的外部账户也是本合约的创建者owner时，指定此时的teacher合约账户
+    }
+
+
+    // 要求仅teacher可进行操作，此时连studentScore合约自己都无法调用onlyOwner修饰的函数！！！
+    modifier onlyTeacher{
+        require(msg.sender == teacher, "only owner can call this function");
+        _;
+    }    
+
+    // // 每次修改时有分数限制；暂时不用，因为不知道如何同时用2个修饰器
+    // modifier scoreCheck(uint score){
+    //     require(score<=100, "score must less than 100");
+    //     _;
+    // }
+
+    // 定义修改mapping的函数，并加入装饰器
+    function changeScore(address addr, uint score) external onlyTeacher(){
+        if (score>100)
+            revert scoreOverflow();
         scores[addr] = score;
     }
 }
 
-interface scoreInterface{
-    function changeScore() external;
+// 定义一个接口来调用合约中的函数
+interface IScore{
+    function changeScore(address addr, uint score) external;
 }
 
 contract Teacher{
-    function changeScore(address addr, uint score) external{
-        scoreInterface(addr, score).changeScore();
+    IScore iscore;
+    constructor(address s){
+        iscore = IScore(s); //在创建teacher合约时，指定调用studentScore合约的接口
+    }
+
+    // 传入接口地址、接口函数对应的2个参数
+    function changeScore(address addr, uint score) public{
+        iscore.changeScore(addr, score);
     }
 }
