@@ -1,0 +1,50 @@
+//SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+
+
+contract NFTMarket is IERC721Receiver{
+    mapping(uint => uint) public tokenIdPrice;
+    address public immutable token;
+    address public immutable nftToken;
+
+    constructor(address _token, address _nftToken) {
+        token = _token;
+        nftToken = _nftToken;
+    }
+
+    function onERC721Received(
+        address operator,
+        address from,
+        uint256 tokenId,
+        bytes calldata data
+    ) external override returns (bytes4) {
+      return this.onERC721Received.selector;
+    }
+
+    // approve(address to, uint256 tokenId) first
+    // 即需要跟普通ERC20一样，用户先进行授权，再将自己的{tokenID:价格}转入该合约中
+    function list(uint tokenID, uint amount) public {
+        IERC721(nftToken).safeTransferFrom(msg.sender, address(this), tokenID, ""); 
+        //使用721协议的safeTransferFrom函数，要求该合约必须有上述的onERC721Received函数，才能接受721协议的NFT
+        tokenIdPrice[tokenID] = amount;
+    }
+
+
+    // 用户尝试用ERC20的token，来购买某个NFT的tokenID
+    function buy(uint tokenId, uint amount) external {
+      // require(tokenId != 0, "invalid token");
+      require(amount >= tokenIdPrice[tokenId], "low price"); //要求该用户的出价>之前存储时的挂单价
+
+      require(IERC721(nftToken).ownerOf(tokenId) == address(this), "aleady selled"); //要求当前合约确实持有tokenId
+
+      IERC20(token).transferFrom(msg.sender, address(this), tokenIdPrice[tokenId]); //将用户的ERC20 token，转入当前合约
+      IERC721(nftToken).transferFrom(address(this), msg.sender, tokenId); //将当前合约中的NFT token，转入用户地址
+    }
+
+
+}
+
