@@ -1,0 +1,11 @@
+
+select 
+    date_trunc('day', minute)  as "date",
+    avg(price) as "price"
+from prices.usd 
+where symbol = 'USDC' 
+    and blockchain = 'ethereum'
+    and minute > now() - Interval '30' day
+group by 1
+order by 1
+limit 5;
