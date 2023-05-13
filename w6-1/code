@@ -1,0 +1,72 @@
+//SPDX-License-Identifier: Unlicense
+pragma solidity ^0.8.0;
+
+import "./IUniswapV2Router01.sol";
+import "./IMasterChef.sol";
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+contract MyTokenMarket {
+    using SafeERC20 for IERC20;
+
+    address public myToken;
+    address public router;
+    address public weth;
+    address public sushi;
+
+    address public masterchef;
+    uint public depsited;
+
+    // 本合约6-1作业相比5-2作业新加的：_sushi（购买的币放进去做质押）， _masterchef
+    constructor(address _token, address _router, address _weth, address _sushi, address _masterchef) {
+        myToken = _token;
+        router = _router; //uniswapV2合约
+        weth = _weth;
+        sushi = _sushi; //由masterchief挖矿得到
+        masterchef = _masterchef;
+    }
+
+    // 添加流动性
+    function AddLiquidity(uint tokenAmount) public payable {
+        IERC20(myToken).safeTransferFrom(msg.sender, address(this),tokenAmount);
+        IERC20(myToken).safeApprove(router, tokenAmount);
+
+        // ingnore slippage
+        // (uint amountToken, uint amountETH, uint liquidity) = 
+        IUniswapV2Router01(router).addLiquidityETH{value: msg.value}(myToken, tokenAmount, 0, 0, msg.sender, block.timestamp);
+
+        //TODO: handle left
+    }
+
+    // 用 ETH 购买 Token，并进行masterchef流行性挖矿
+    function buyToken(uint minTokenAmount) public payable {
+        address[] memory path = new address[](2);
+        path[0] = weth;
+        path[1] = myToken;
+
+        // 购买之后，发送给当前合约地址address(this)        
+        IUniswapV2Router01(router).swapExactETHForTokens{value : msg.value}(
+            minTokenAmount, path, address(this), block.timestamp);
+
+        uint amount = IERC20(myToken).balanceOf(address(this)); //计算此时当前合约持有的mytoken个数
+
+        IERC20(myToken).safeApprove(masterchef, amount); //先授权给masterchef ，这样才能使用deposit中的safeTransferFrom函数
+        IMasterChef(masterchef).deposit(0, amount); //再将当前合约将持有的amount个mytoken，存入masterchef合约中
+
+        depsited += amount; //记录存入masterchef合约中的mytoken数量，方便之后withdraw取出
+
+    }
+
+    function withdraw() public {
+        //从masterchef中取出全部mytoken(即lp token）、流动性挖矿得到的sushi奖励，转移到当前合约中
+        IMasterChef(masterchef).withdraw(0, depsited); 
+        
+        IERC20(myToken).safeTransfer(msg.sender, depsited); //再将myToken，从当前合约，返回给用户
+        uint amount = IERC20(sushi).balanceOf(address(this));
+        IERC20(sushi).safeTransfer(msg.sender, amount); //再将sushi，从当前合约，返回给用户
+
+    }
+
+
+}
